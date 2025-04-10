@@ -3,6 +3,13 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/Transacciones del intervalo 2025-02-01 a 2025-02-01" />
+      <excludeFolder url="file://$MODULE_DIR$/Transacciones del intervalo 2025-02-02 a 2025-02-02" />
+      <excludeFolder url="file://$MODULE_DIR$/Transacciones del intervalo 2025-02-10 a 2025-04-10" />
+      <excludeFolder url="file://$MODULE_DIR$/Transacciones del intervalo 2025-03-01 a 2025-03-30" />
+      <excludeFolder url="file://$MODULE_DIR$/Transacciones del intervalo 2025-03-30 a 2025-04-10" />
+      <excludeFolder url="file://$MODULE_DIR$/Transacciones del intervalo 2025-04-01 a 2025-04-10" />
+      <excludeFolder url="file://$MODULE_DIR$/Transacciones del intervalo 2025-04-03 a 2025-04-10" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.13 (PythonProject)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

@@ -22,7 +22,7 @@ with open("credencialesPayway.txt", "r", encoding="utf-8") as archivo:
 usuario = credenciales["usuario"]
 contrasena = credenciales["contrasena"]
 
-tiempo_de_espera = 600000  # Ajustado a un tiempo razonable
+tiempo_de_espera = 900000  # Ajustado a un tiempo razonable
 
 def entrarPagina(pagina):
     # Navegar a la página de login
@@ -71,6 +71,91 @@ def descargar_y_convertir(pagina, fecha_formato_guardado, hora_inicio, minuto_in
     os.remove(ruta_csv)
     return ruta_excel
 
+def buscarDia(fecha,pagina):
+    global fecha_formato_mostrar
+    global fecha_formato_guardado
+    fecha_formato_mostrar = fecha.strftime("%d/%m/%Y")
+    fecha_formato_guardado = fecha.strftime("%Y-%m-%d")
+    # Establecer la búsqueda para todo el día (00:00 - 23:59)
+    pagina.fill("input[name='sacparam_fechaini']", fecha_formato_mostrar)
+    pagina.fill("input[name='sacparam_fechafin']", fecha_formato_mostrar)
+    pagina.fill("input[name='sacparam_horaini']", "00")
+    pagina.fill("input[name='sacparam_minutoini']", "00")
+    pagina.fill("input[name='sacparam_horafin']", "23")
+    pagina.fill("input[name='sacparam_minutofin']", "59")
+    pagina.click("input[name='b_consultaform']", timeout=tiempo_de_espera)
+    pagina.wait_for_load_state("networkidle", timeout=tiempo_de_espera)
+
+def errorAlBuscarDia(pagina):
+    mesaje_errorExtraño = pagina.locator("p:has-text('Ha ocurrido un error')")
+    return mesaje_errorExtraño.count() > 0
+def transaccionesSuperadas(pagina):
+    mensaje_error = pagina.locator("td.textonaranja")
+    return mensaje_error.count() > 0 and "5000 transacciones" in mensaje_error.text_content()
+def procesarDia(pagina,fecha_actual):
+    global fecha_formato_mostrar
+    global fecha_formato_guardado
+    global fecha_inicio_usuario
+    global fecha_fin_usuario
+    global fecha_inicio
+    global fecha_fin
+    global reintentos_actuales
+
+
+
+
+    if errorAlBuscarDia(pagina):
+        logging.warning(f"El dia{fecha_actual} arrojo un error.Se reintentara mas tarde.")
+        dias_con_error.append(fecha_actual)
+        entrarPagina(pagina)
+    else:
+        if transaccionesSuperadas(pagina):
+            logging.info(f" Más de 5000 transacciones el {fecha_formato_mostrar}, dividiendo en mañana y tarde")
+
+            for parte_del_dia, hora_inicio, minuto_inicio, hora_fin, minuto_fin in [
+                ("mañana", "00", "00", "11", "59"),
+                ("tarde", "12", "00", "23", "59")
+            ]:
+                archivo = descargar_y_convertir(pagina, fecha_formato_guardado, hora_inicio, minuto_inicio, hora_fin,
+                                                minuto_fin, parte_del_dia)
+                lista_archivos_excel.append(archivo)
+
+                # Rehacer la consulta para ver si hay más de 5000 registros en la mañana o tarde
+                pagina.fill("input[name='sacparam_horaini']", hora_inicio)
+                pagina.fill("input[name='sacparam_minutoini']", minuto_inicio)
+                pagina.fill("input[name='sacparam_horafin']", hora_fin)
+                pagina.fill("input[name='sacparam_minutofin']", minuto_fin)
+                pagina.click("input[name='b_consultaform']", timeout=tiempo_de_espera)
+                pagina.wait_for_load_state("networkidle", timeout=tiempo_de_espera)
+
+                mensaje_error = pagina.locator("td.textonaranja")
+
+                if transaccionesSuperadas(pagina):
+                    logging.info(
+                        f" Más de 5000 transacciones en {parte_del_dia} del {fecha_formato_mostrar}, dividiendo en 4 intervalos")
+
+                    for sub_parte, h_inicio, m_inicio, h_fin, m_fin in [
+                        ("madrugada", "00", "00", "05", "59"),
+                        ("mañana", "06", "00", "11", "59"),
+                        ("tarde", "12", "00", "17", "59"),
+                        ("noche", "18", "00", "23", "59")
+                    ]:
+                        archivo = descargar_y_convertir(pagina, fecha_formato_guardado, h_inicio, m_inicio, h_fin,
+                                                        m_fin, sub_parte)
+                        lista_archivos_excel.append(archivo)
+
+        else:
+            archivo = descargar_y_convertir(pagina, fecha_formato_guardado, "00", "00", "23", "59", "completo")
+            lista_archivos_excel.append(archivo)
+
+        logging.info(f"Finalizado el dia {fecha_actual}")
+    return fecha_actual
+lista_archivos_excel = []  # Lista de archivos Excel descargados y convertidos
+reintentos_actuales = 0
+dias_con_error = []
+fecha_formato_mostrar = 0
+fecha_formato_guardado = 0
+ejecucion_inicial_terminada = False
 
 with sync_playwright() as navegador:
     fecha_inicio_usuario = input("Ingrese la fecha de inicio (dd/mm/aaaa): ")
@@ -93,70 +178,16 @@ with sync_playwright() as navegador:
 
     entrarPagina(pagina)
 
-    lista_archivos_excel = []  # Lista de archivos Excel descargados y convertidos
-
     fecha_actual = fecha_inicio
     while fecha_actual <= fecha_fin:
-        fecha_formato_mostrar = fecha_actual.strftime("%d/%m/%Y")
-        fecha_formato_guardado = fecha_actual.strftime("%Y-%m-%d")
-
-        # Establecer la búsqueda para todo el día (00:00 - 23:59)
-        pagina.fill("input[name='sacparam_fechaini']", fecha_formato_mostrar)
-        pagina.fill("input[name='sacparam_fechafin']", fecha_formato_mostrar)
-        pagina.fill("input[name='sacparam_horaini']", "00")
-        pagina.fill("input[name='sacparam_minutoini']", "00")
-        pagina.fill("input[name='sacparam_horafin']", "23")
-        pagina.fill("input[name='sacparam_minutofin']", "59")
-        pagina.click("input[name='b_consultaform']", timeout=tiempo_de_espera)
-        pagina.wait_for_load_state("networkidle", timeout=tiempo_de_espera)
-
-        mensaje_error = pagina.locator("td.textonaranja")
-        mesaje_errorExtraño = pagina.locator("p:has-text('Ha ocurrido un error')")
-
-        if mesaje_errorExtraño.count() > 0:
-            logging.warning(f"El dia{fecha_actual} arrojo un error. Pasando al siguiente dia.")
-            fecha_actual += timedelta(days=1)
-            entrarPagina(pagina)
-        else:
-            if mensaje_error.count() > 0 and "5000 transacciones" in mensaje_error.text_content():
-                logging.info(f" Más de 5000 transacciones el {fecha_formato_mostrar}, dividiendo en mañana y tarde")
-
-                for parte_del_dia, hora_inicio, minuto_inicio, hora_fin, minuto_fin in [
-                    ("mañana", "00", "00", "11", "59"),
-                    ("tarde", "12", "00", "23", "59")
-                ]:
-                    archivo = descargar_y_convertir(pagina, fecha_formato_guardado, hora_inicio, minuto_inicio, hora_fin, minuto_fin, parte_del_dia)
-                    lista_archivos_excel.append(archivo)
-
-                    # Rehacer la consulta para ver si hay más de 5000 registros en la mañana o tarde
-                    pagina.fill("input[name='sacparam_horaini']", hora_inicio)
-                    pagina.fill("input[name='sacparam_minutoini']", minuto_inicio)
-                    pagina.fill("input[name='sacparam_horafin']", hora_fin)
-                    pagina.fill("input[name='sacparam_minutofin']", minuto_fin)
-                    pagina.click("input[name='b_consultaform']", timeout=tiempo_de_espera)
-                    pagina.wait_for_load_state("networkidle", timeout=tiempo_de_espera)
-
-                    mensaje_error = pagina.locator("td.textonaranja")
-
-                    if mensaje_error.count() > 0 and "5000 transacciones" in mensaje_error.text_content():
-                        logging.info(f" Más de 5000 transacciones en {parte_del_dia} del {fecha_formato_mostrar}, dividiendo en 4 intervalos")
-
-                        for sub_parte, h_inicio, m_inicio, h_fin, m_fin in [
-                            ("madrugada", "00", "00", "05", "59"),
-                            ("mañana", "06", "00", "11", "59"),
-                            ("tarde", "12", "00", "17", "59"),
-                            ("noche", "18", "00", "23", "59")
-                        ]:
-                            archivo = descargar_y_convertir(pagina, fecha_formato_guardado, h_inicio, m_inicio, h_fin, m_fin, sub_parte)
-                            lista_archivos_excel.append(archivo)
-
-            else:
-                archivo = descargar_y_convertir(pagina, fecha_formato_guardado, "00", "00", "23", "59", "completo")
-                lista_archivos_excel.append(archivo)
-
-            logging.info(f"Finalizado el dia {fecha_actual}")
-            fecha_actual += timedelta(days=1)
-
+       buscarDia(fecha_actual, pagina)
+       procesarDia(pagina, fecha_actual)
+       fecha_actual += timedelta(days=1)
+    logging.info("Descarga de dias terminados. Se procede a reintar los dias con error")
+    for dia_con_error in dias_con_error:
+        logging.info("Se reintenta el dia")
+        buscarDia(dia_con_error, pagina)
+        procesarDia(pagina,dia_con_error)
 
     logging.info("Descargas y conversiones a Excel completadas. Uniendo archivos...")
 
