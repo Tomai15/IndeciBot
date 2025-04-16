@@ -197,4 +197,5 @@ with sync_playwright() as navegador:
     datos_finales.to_excel(os.path.join(ruta_carpeta,"transacciones_completas.xlsx") , index=False)
 
     logging.info("Archivos combinados en transacciones_completas.xlsx")
+
     navegador_web.close()
