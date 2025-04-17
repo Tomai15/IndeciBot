@@ -1,2 +1,0 @@
-usuario=tomas_delgado
-contrasena=ChupalaCarre12

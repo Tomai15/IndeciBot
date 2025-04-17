@@ -14,9 +14,11 @@ logging.basicConfig(
 logging.getLogger("asyncio").setLevel(logging.WARNING)
 
 with sync_playwright() as navegador:
-    tiempo_de_espera = 900000
+    tiempo_de_espera = 90000000
     fecha_inicio_usuario = input("Ingrese la fecha de inicio (dd/mm/aaaa): ")
     fecha_fin_usuario = input("Ingrese la fecha de fin (dd/mm/aaaa): ")
+    fecha_inicio = datetime.strptime(fecha_inicio_usuario, "%d/%m/%Y")
+    fecha_fin = datetime.strptime(fecha_fin_usuario, "%d/%m/%Y")
 
     navegador_web = navegador.chromium.launch(headless=False)
     pagina = navegador_web.new_page()
@@ -44,6 +46,8 @@ with sync_playwright() as navegador:
     pagina.select_option('select#mySelect',value= "14")
     pagina.click("input[type='button']")
     pagina.wait_for_load_state("load",timeout=tiempo_de_espera)
+    logging.info("Ingreso correcto a CDP")
+    logging.info("Ingresando a reportes")
     pagina.goto("http://10.94.164.155:16000/ConcentradorDePedidos/secciones/listadoVentas")
     pagina.wait_for_load_state("load",timeout=tiempo_de_espera)
 
@@ -51,6 +55,7 @@ with sync_playwright() as navegador:
     pagina.fill("input[name='fechaMin']", fecha_inicio_usuario)
     pagina.fill("input[name='ctrl.fechaMax']", fecha_fin_usuario)
     pagina.click("text=BUSCAR")
+    logging.info("Fechas filtradas correctamente. Exportando")
     pagina.wait_for_selector("table tbody tr", timeout=tiempo_de_espera)
     pagina.click("text=EXPORTAR")
 
@@ -60,10 +65,11 @@ with sync_playwright() as navegador:
     ruta_carpeta = os.path.join(os.getcwd(), "descargas_CDP")
     os.makedirs(ruta_carpeta, exist_ok=True)
 
+
     archivo_descargado = informacion_descarga.value
-    nombre_archivo = f"transacciones_CDP_{fecha_inicio_usuario}_{fecha_fin_usuario}.xlsx"
+    nombre_archivo = f"transacciones_CDP_{fecha_inicio.strftime("%Y-%m-%d")}_{fecha_fin.strftime("%Y-%m-%d")}.xlsx"
+    logging.info(f"Descarga realizada en {nombre_archivo}")
     ruta_csv = os.path.join(ruta_carpeta, nombre_archivo)
     archivo_descargado.save_as(ruta_csv)
 
-    input("Presioná ENTER para continuar una vez que terminaste en el navegador...")
 
