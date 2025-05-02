@@ -6,25 +6,11 @@ import pandas as pd
 from datetime import datetime, timedelta
 import logging
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler(),logging.FileHandler(f'log_ejecucion_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log', encoding="utf-8") ]
-)
-logging.getLogger("asyncio").setLevel(logging.WARNING)
 
-credenciales = {}
-with open("credencialesPayway.txt", "r", encoding="utf-8") as archivo:
-    for linea in archivo:
-        clave, valor = linea.strip().split("=")  # Separa clave y valor
-        credenciales[clave] = valor
-
-usuario = credenciales["usuario"]
-contrasena = credenciales["contrasena"]
-
-tiempo_de_espera = 900000  # Ajustado a un tiempo razonable
 
 def entrarPagina(pagina):
+    global usuario
+    global contrasena
     # Navegar a la página de login
     pagina.goto("https://ventasonline.payway.com.ar/sac/SAC")
     pagina.wait_for_load_state("load")
@@ -39,6 +25,7 @@ def entrarPagina(pagina):
 
 
 def descargar_y_convertir(pagina, fecha_formato_guardado, hora_inicio, minuto_inicio, hora_fin, minuto_fin, etiqueta):
+    global ruta_carpeta
     """Descarga el CSV, lo convierte a Excel y lo almacena en la lista de archivos."""
 
     # Esperar a que los campos de hora estén disponibles
@@ -100,9 +87,7 @@ def procesarDia(pagina,fecha_actual):
     global fecha_inicio
     global fecha_fin
     global reintentos_actuales
-
-
-
+    global ruta_carpeta
 
     if errorAlBuscarDia(pagina):
         logging.warning(f"El dia{fecha_actual} arrojo un error.Se reintentara mas tarde.")
@@ -150,52 +135,83 @@ def procesarDia(pagina,fecha_actual):
 
         logging.info(f"Finalizado el dia {fecha_actual}")
     return fecha_actual
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(),logging.FileHandler(f'log_ejecucion_indeciBot_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log', encoding="utf-8") ]
+)
+logging.getLogger("asyncio").setLevel(logging.WARNING)
+
+
+
+tiempo_de_espera = 900000  # Ajustado a un tiempo razonable
+
 lista_archivos_excel = []  # Lista de archivos Excel descargados y convertidos
 reintentos_actuales = 0
 dias_con_error = []
 fecha_formato_mostrar = 0
 fecha_formato_guardado = 0
 ejecucion_inicial_terminada = False
+ruta_carpeta = ""
+usuario = ""
+contrasena = ""
 
-with sync_playwright() as navegador:
-    fecha_inicio_usuario = input("Ingrese la fecha de inicio (dd/mm/aaaa): ")
-    fecha_fin_usuario = input("Ingrese la fecha de fin (dd/mm/aaaa): ")
+def descargarDecidir(fecha_inicio_usuario, fecha_fin_usuario):
+    with sync_playwright() as navegador:
+        global ruta_carpeta
+        global usuario
+        global contrasena
+        credenciales = {}
+        with open("credencialesPayway.txt", "r", encoding="utf-8") as archivo:
+            for linea in archivo:
+                clave, valor = linea.strip().split("=")  # Separa clave y valor
+                credenciales[clave] = valor
 
-    fecha_inicio = datetime.strptime(fecha_inicio_usuario, "%d/%m/%Y")
-    fecha_fin = datetime.strptime(fecha_fin_usuario, "%d/%m/%Y")
+        usuario = credenciales["usuario"]
+        contrasena = credenciales["contrasena"]
 
-    nombre_carpeta = f"Transacciones del intervalo {fecha_inicio.date()} a {fecha_fin.date()}"
-    ruta_carpeta = os.path.join(os.getcwd(), nombre_carpeta)
+        #fecha_inicio_usuario = input("Ingrese la fecha de inicio (dd/mm/aaaa): ")
+        #fecha_fin_usuario = input("Ingrese la fecha de fin (dd/mm/aaaa): ")
 
-    # Crear la carpeta si no existe
-    if not os.path.exists(ruta_carpeta):
-        os.makedirs(ruta_carpeta)
+        fecha_inicio = datetime.strptime(fecha_inicio_usuario, "%d/%m/%Y")
+        fecha_fin = datetime.strptime(fecha_fin_usuario, "%d/%m/%Y")
 
-    logging.info(f"Carpeta creada en {ruta_carpeta}")
-    # Lanzar el navegador
-    navegador_web = navegador.chromium.launch(headless=False)
-    pagina = navegador_web.new_page()
+        nombre_carpeta = f"Transacciones del intervalo {fecha_inicio.date()} a {fecha_fin.date()}"
+        ruta_carpeta = os.path.join(os.getcwd(), nombre_carpeta)
 
-    entrarPagina(pagina)
+        # Crear la carpeta si no existe
+        if not os.path.exists(ruta_carpeta):
+            os.makedirs(ruta_carpeta)
 
-    fecha_actual = fecha_inicio
-    while fecha_actual <= fecha_fin:
-       buscarDia(fecha_actual, pagina)
-       procesarDia(pagina, fecha_actual)
-       fecha_actual += timedelta(days=1)
-    logging.info("Descarga de dias terminados. Se procede a reintar los dias con error")
-    for dia_con_error in dias_con_error:
-        logging.info("Se reintenta el dia")
-        buscarDia(dia_con_error, pagina)
-        procesarDia(pagina,dia_con_error)
+        logging.info(f"Carpeta creada en {ruta_carpeta}")
+        # Lanzar el navegador
+        navegador_web = navegador.chromium.launch(headless=False)
+        pagina = navegador_web.new_page()
 
-    logging.info("Descargas y conversiones a Excel completadas. Uniendo archivos...")
+        entrarPagina(pagina)
 
-    # Unir todos los archivos Excel en uno solo
-    lista_datos = [pd.read_excel(archivo) for archivo in lista_archivos_excel]
-    datos_finales = pd.concat(lista_datos, ignore_index=True)
-    datos_finales.to_excel(os.path.join(ruta_carpeta,"transacciones_completas.xlsx") , index=False)
+        fecha_actual = fecha_inicio
+        while fecha_actual <= fecha_fin:
+           buscarDia(fecha_actual, pagina)
+           procesarDia(pagina, fecha_actual)
+           fecha_actual += timedelta(days=1)
+        logging.info("Descarga de dias terminados. Se procede a reintar los dias con error")
+        for dia_con_error in dias_con_error:
+            logging.info("Se reintenta el dia")
+            buscarDia(dia_con_error, pagina)
+            procesarDia(pagina,dia_con_error)
 
-    logging.info("Archivos combinados en transacciones_completas.xlsx")
+        logging.info("Descargas y conversiones a Excel completadas. Uniendo archivos...")
 
-    navegador_web.close()
+        # Unir todos los archivos Excel en uno solo
+        lista_datos = [pd.read_excel(archivo) for archivo in lista_archivos_excel]
+        datos_finales = pd.concat(lista_datos, ignore_index=True)
+        datos_finales.to_excel(os.path.join(ruta_carpeta,"transacciones_completas.xlsx") , index=False)
+
+        logging.info("Archivos combinados en transacciones_completas.xlsx")
+
+        navegador_web.close()
+
+if __name__ == "__main__":
+    descargarDecidir("","")
