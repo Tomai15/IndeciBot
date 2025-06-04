@@ -207,6 +207,8 @@ def descargarDecidir(fecha_inicio_usuario, fecha_fin_usuario):
         # Unir todos los archivos Excel en uno solo
         lista_datos = [pd.read_excel(archivo) for archivo in lista_archivos_excel]
         datos_finales = pd.concat(lista_datos, ignore_index=True)
+        # Elimino todas las columnas sobrantes
+        datos_finales = datos_finales[["id oper.","Fecha original","Monto","Estado","Tarjeta"]]
         datos_finales.to_excel(os.path.join(ruta_carpeta,"transacciones_completas.xlsx") , index=False)
 
         logging.info("Archivos combinados en transacciones_completas.xlsx")

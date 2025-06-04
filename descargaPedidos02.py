@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 import pandas as pd
 import time
+from collections import defaultdict
 
 # Configuración de logging
 logging.basicConfig(
@@ -138,13 +139,21 @@ def descargarVtex(fecha_inicio_usuario,fecha_fin_usuario):
 
     logging.info(f"Eliminando repetidos")
 
-    pedidos_unicos = {}
+    grupos = defaultdict(list)
     for pedido in todos_los_pedidos:
-        pedidos_unicos[pedido["orderId"]] = pedido
+        if pedido["orderId"].endswith(("-01", "-02")):
+            clave = pedido["orderId"][:-3]
+            grupos[clave].append(pedido)
 
+    # Quedarse solo con los que tienen ambos
+    resultado = []
+    for pedidos in grupos.values():
+        sufijos = {p["orderId"][-3:] for p in pedidos}
+        if "-01" in sufijos and "-02" in sufijos:
+            resultado.extend(pedidos)
     logging.info(f"Buscando el seller de cada pedido")
 
-    for i in range(0, len(todos_los_pedidos), 6000):
+    for i in range(0, len(resultado), 6000):
         lote = todos_los_pedidos[i:i + 6000]
         inicio = time.time()
         resultados = procesar_lote(lote)
@@ -163,15 +172,16 @@ def descargarVtex(fecha_inicio_usuario,fecha_fin_usuario):
             time.sleep(60 - duracion)
         logging.info(f"Se descargaron {i*6000}")
 
+
+
+
     logging.info(f"Descargas finalizadas. Convirtiendo a Excel")
     # Exportar a Excel
     ruta_carpeta = os.path.join(os.getcwd(), "descargas_vtex")
     os.makedirs(ruta_carpeta, exist_ok=True)
     archivo = os.path.join(ruta_carpeta, f"pedidos_vtex_{fecha_desde.date()}_a_{fecha_hasta.date()}.xlsx")
-    pedidos_vtex = pd.DataFrame(todos_los_pedidos)
-    pedidos_vtex = pedidos_vtex[["orderId","sequence","creationDate","paymentNames","seller","statusDescription"]]
-    pedidos_vtex.to_excel(archivo, index=False)
+    pd.DataFrame(resultado).to_excel(archivo, index=False)
     logging.info(f"Exportado a: {archivo}")
 
 if __name__ == "__main__":
-    descargarVtex("18/05/2025","21/05/2025")
+    descargarVtex("1/01/2025","28/02/2025")

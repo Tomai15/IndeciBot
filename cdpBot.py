@@ -71,4 +71,18 @@ def descargarCDP(fecha_inicio_usuario,fecha_fin_usuario):
         ruta_csv = os.path.join(ruta_carpeta, nombre_archivo)
         archivo_descargado.save_as(ruta_csv)
 
+        #Elimino las columnas
+        # Leer el Excel descargado como DataFrame
+        datosCDP = pd.read_excel(ruta_csv)
+
+        # Elegir solo las columnas que querés conservar
+        columnas_a_conservar = ["NUMERO PEDIDO", "NUMERO DE PUNTO","FECHA PEDIDO","ESTADO"]  # Reemplazá con los nombres reales
+        datosCDP = datosCDP[columnas_a_conservar]
+
+        # Sobrescribir el archivo con las columnas filtradas
+        datosCDP.to_excel(ruta_csv, index=False)
+
+        logging.info("Archivo filtrado correctamente con solo las columnas necesarias.")
+
+
 
