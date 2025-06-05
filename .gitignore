@@ -1,6 +1,10 @@
 credencialesPayway.txt
+credencialesCDP.txt
+credencialesVTEX.txt
 *.log
 Transacciones*/
 credencialesCDP.txt
 credencialesVTEX.txt
+descargas_CDP
+descargas_vtex
 *.xlsx
